@@ -12,15 +12,21 @@ DEBUG_FLAGS := -g -lineinfo
 
 NVCC_FLAGS := $(GENCODE_FLAGS) $(DEBUG_FLAGS) -O3 -std=c++11 -m64 --use_fast_math -Xptxas '-v'
 
-INCLUDES  := -I$(CUDNN_PATH)/include -I$(CUDA_PATH)/include -I. -I/home/utils/boost-1.64.0/gcc-5.3.0/include
-LIBRARIES := -lcudnn -lstdc++fs -L$(CUDNN_PATH)/lib64
+INCLUDES  := -I$(CUDNN_PATH)/include -I$(CUDA_PATH)/include -I. -I/home/utils/boost-1.64.0/gcc-5.3.0/include -I/home/utils/libpng-1.6.1/include
+LIBRARIES := -lcudnn -lstdc++fs -L$(CUDNN_PATH)/lib64 -L/home/utils/libpng-1.6.1/lib -lpng -Xlinker '-rpath /home/utils/libpng-1.6.1/lib'
 
 
 NVCC      := $(CUDA_PATH)/bin/nvcc
 
-draw_clover_SOURCES := clover_kernel.cu main.cpp
-draw_clover_OBJECTS := $(patsubst %.cu, obj/%.cu.o, $(patsubst %.cpp, obj/%.o, $(test_memcpy_SOURCES)))
-ALL_TARGETS := draw_clover
+draw_clover_SOURCES := clover_kernel.cu main.cu
+draw_clover_OBJECTS := $(patsubst %.cu, obj/%.cu.o, $(patsubst %.cpp, obj/%.o, $(draw_clover_SOURCES)))
+
+$(info $(draw_clover_OBJECTS))
+
+ALL_TARGETS := draw_clover.exe
+
+draw_clover.exe: $(draw_clover_OBJECTS)
+	$(NVCC) $(GENCODE_FLAGS) $(INCLUDES) $(NVCC_FLAGS) $(LIBRARIES) $^ -o $@
 
 obj/%.cu.o: %.cu obj/%.cu.d | obj
 	@ echo "Compiling Cuda $@"
@@ -47,8 +53,7 @@ obj/%.cu.d: ;
 obj/%.d: ;
 
 
--include $(test_memcpy_OBJECTS:.o=.d)
--include $(test_conv_OBJECTS:.o=.d)
+-include $(draw_clover_OBJECTS:.o=.d)
 
 clean:
 	rm -f obj/*.o *.cubin* *.i *.ii *.cudafe* *.fatbin* *.ptx *.sass *.exe

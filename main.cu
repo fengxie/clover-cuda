@@ -5,8 +5,10 @@
 
 #include <png.h>
 
-__global__ void clover_kernel(uchar4 *image, size_t stride, const dim2 center);
-extern int write_png(char* filename, int width, int height, unsigned char *buffer, char* title);
+#include "util.h"
+
+__global__ void clover_kernel(uchar4 *image, float scale, size_t stride, const dim3 center);
+extern int write_png(const char *filename, int width, int height, unsigned char *buffer, char* title);
 
 int main(const int argc, const char *argv[])
 {
@@ -16,16 +18,19 @@ int main(const int argc, const char *argv[])
     const size_t height = 1024;
     const size_t width  = 1024;
     const size_t size   = 4 * height * width;
-    output = new uchar[size];
+    output = new unsigned char[size];
 
-    CUDA_ASSERT(cudaMalloc((void **)&device_output, size * sizeof(uchar)), "");
+    CUDA_ASSERT(cudaMalloc((void **)&device_output, size * sizeof(unsigned char)), "");
 
-    CUDA_ASSERT(cudaMemcpy(device_output, output, size * sizeof(uchar), cudaMemcpyHostToDevice), "");
+    CUDA_ASSERT(cudaMemcpy(device_output, output, size * sizeof(unsigned char), cudaMemcpyHostToDevice), "");
 
-    dim3 blocks(1, 1, 1);
+    dim3 threads(16, 16, 1);
+    dim3 blocks(width / threads.x, height / threads.y, 1);
+    dim3 center(width / 2, height / 2, 1);
+    clover_kernel<<<blocks, threads>>>((uchar4 *)device_output, 512.0f, width, center);
 
-    CUDA_ASSERT(cudaMemcpy(output, device_output, size * sizeof(uchar), cudaMemcpyDeviceToHost), "");
-    write_png("clover.png", width, height, output, NULL);
+    CUDA_ASSERT(cudaMemcpy(output, device_output, size * sizeof(unsigned char), cudaMemcpyDeviceToHost), "");
+    write_png("clover.png", width, height, output, "Clover");
 
     CUDA_ASSERT(cudaFree(device_output), "");
 
@@ -34,13 +39,12 @@ int main(const int argc, const char *argv[])
     return 0;
 }
 
-int write_png(char* filename, int width, int height, unsigned char *buffer, char* title)
+int write_png(const char* filename, int width, int height, unsigned char *buffer, char* title)
 {
    int code = 0;
    FILE *fp = NULL;
    png_structp png_ptr = NULL;
    png_infop info_ptr = NULL;
-   png_bytep row = NULL;
 
    // Open file for writing (binary mode)
    fp = fopen(filename, "wb");
@@ -77,7 +81,7 @@ int write_png(char* filename, int width, int height, unsigned char *buffer, char
 
    // Write header (8 bit colour depth)
    png_set_IHDR(png_ptr, info_ptr, width, height,
-         8, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
+         8, PNG_COLOR_TYPE_RGBA, PNG_INTERLACE_NONE,
          PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
 
    // Set title
@@ -92,7 +96,7 @@ int write_png(char* filename, int width, int height, unsigned char *buffer, char
    png_write_info(png_ptr, info_ptr);
 
    // Write image data
-   int x, y;
+   int y;
    for (y = 0 ; y < height ; y++) {
       png_write_row(png_ptr, buffer + y * width * 4);
    }
