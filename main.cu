@@ -26,7 +26,7 @@ int main(const int argc, const char *argv[])
     input  = new unsigned char[size];
     output = new unsigned char[size];
 
-    read_png("background.png", width, height, input);
+    read_png("clover.png", width, height, input);
 
     CUDA_ASSERT(cudaMalloc((void **)&device_input, size * sizeof(unsigned char)), "");
     CUDA_ASSERT(cudaMalloc((void **)&device_output, size * sizeof(unsigned char)), "");
